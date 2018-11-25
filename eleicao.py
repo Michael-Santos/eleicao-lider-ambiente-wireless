@@ -5,8 +5,9 @@
 #   Washington Paes Marques da Silva
 ##############################################
 
-import treading
+import threading
 import socket
+import json
 
 
 ##############################################
@@ -48,9 +49,9 @@ def configurarVizinhos(idRoteador):
 ##############################################
 
 # Recebe mensagens via socket UDP
-def receiver(idPross, portaPross):
+def receiver(idNo, capacidade, idNoPai, vizinhos, vizinhosEsperandoResposta):
 	sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	server_address = ('', PORTAS_PROCESSOS[portaPross])
+	server_address = ('', 10000 + idNo)
 	sock.bind(server_address)
 
 	while(True):
@@ -67,22 +68,28 @@ def sender(mensagem, portaPross):
 ##############################################
 
 # Recebe id do nó e a sua capacidade
-idNo = input("ID do nó: ")
-capacidade = input("Capacidade: ")
-capacidade = [capacidade]
+idNo = int(input("ID do nó: "))
+capacidade = [int(input("Capacidade: "))]
+idNoPai = [None]
+idEleicaoAtual = [None]
 
 # Obtém os vizinhos
-vizinhos = configurarVizinhos(idNo)
+vizinhos = configurarVizinhos(int(idNo))
+vizinhosEsperandoResposta = vizinhos.copy()
 
 # Configura o servidor UDP para esse nó
-t1 = threading.Thread(target=receiver, args=(idNo, capacidade, vizinhos))
+t1 = threading.Thread(target=receiver, args=(idNo, capacidade, idNoPai, vizinhos, vizinhosEsperandoResposta))
 t1.start()
 
-# Execução
-whlile(True):
+# Inicia uma nova eleição recebendo um id de eleição e enviado uma mensagem de eleição aos seus vizinhos
+while(True): 
 	input()
 	idEleicao = input("ID Eleição: ")
-	mensagem = {"tipo": "eleicao", "remetente": idNo, "idEleicao": idEleicao, "pai": }
+	mensagem = {"tipo": "eleicao", "remetente": idNo, "idEleicao": idEleicao.zfill(3) + str(idNo).zfill(3), "pai": idNo}
+	jsonMensagem = json.dumps(mensagem)
+
+	for vizinho in vizinhos:
+		sender(jsonMensagem, 10000+vizinho)
 
 
 
