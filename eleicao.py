@@ -89,8 +89,11 @@ def eleicaoCoordenador(mensagemJson, idNo, capacidade, idNoPai, vizinhos, vizinh
 			mensagem = {"tipo": "eleicao", "remetente": idNo, "idEleicao": mensagem["idEleicao"], "pai": mensagem["pai"]}
 			jsonMensagem = json.dumps(mensagem)
 
+			time.sleep(15)
 			for vizinho in vizinhosEsperandoResposta:
 				sender(jsonMensagem, 10000+vizinho)
+
+		time.sleep(15)
 
 	# Caso ainda tenha o vizinho no vetor vizinhosEsperandoResposta ele é removido
 	elif mensagem["tipo"] == "ok":
@@ -118,6 +121,8 @@ def eleicaoCoordenador(mensagemJson, idNo, capacidade, idNoPai, vizinhos, vizinh
 				sender(jsonMensagem, 10000+filho)
 			return
 
+		time.sleep(30)
+
 	# Repassa o novo coordenador para os seus filhos
 	elif mensagem["tipo"] == "atualizarCoordenador":
 		print("Vencedor é o nó " + str(mensagem["idMaiorRecurso"]) + " que possui capacidade: " + str(mensagem["recursoAtualizado"]))
@@ -125,6 +130,8 @@ def eleicaoCoordenador(mensagemJson, idNo, capacidade, idNoPai, vizinhos, vizinh
 				mensagem = {"tipo": "atualizarCoordenador", "remetente": idNo, "idEleicao": mensagem["idEleicao"], "recursoAtualizado": mensagem["recursoAtualizado"], "idMaiorRecurso": mensagem["idMaiorRecurso"]}
 				jsonMensagem = json.dumps(mensagem)
 				sender(jsonMensagem, 10000+filho)
+
+		time.sleep(30)
 		
 	# Quando não houver mais vizinhos para iterar é enviado a quantidade de recurso para o nó pai
 	if not vizinhosEsperandoResposta and not enviadoRecurso[0]:
@@ -135,7 +142,7 @@ def eleicaoCoordenador(mensagemJson, idNo, capacidade, idNoPai, vizinhos, vizinh
 		print("Enviado recurso " + str(mensagem["recurso"]) + " para " + str(idNoPai[0]))
 		enviadoRecurso[0] = True
 	
-	time.sleep(40)
+	#time.sleep(40)
 
 
 ##############################################
