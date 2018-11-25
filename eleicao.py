@@ -51,7 +51,7 @@ def configurarVizinhos(idRoteador):
 ##############################################
 
 # Executa a eleição do coordenador
-def eleicaoCoordenador(mensagemJson, idNo, capacidade, idNoPai, vizinhos, vizinhosEsperandoResposta, filhos, idEleicaoAtual, maiorRecurso):
+def eleicaoCoordenador(mensagemJson, idNo, capacidade, idNoPai, vizinhos, vizinhosEsperandoResposta, filhos, idEleicaoAtual, maiorRecurso, idMaiorRecurso, enviadoRecurso):
 	mensagem = json.loads(mensagemJson.decode('utf-8'))
 
 	# Verifica se há eleição atual, caso exista escolhe a com maior prioridade 
@@ -75,11 +75,11 @@ def eleicaoCoordenador(mensagemJson, idNo, capacidade, idNoPai, vizinhos, vizinh
 			mensagem = {"tipo": "ok", "remetente": idNo, "idEleicao": mensagem["idEleicao"], "pai": mensagem["pai"]}
 			jsonMensagem = json.dumps(mensagem)
 			sender(jsonMensagem, 10000+remetenteMensagemRecebida)
-			
-			#if remetenteMensagemRecebida in vizinhosEsperandoResposta:
-			#	vizinhosEsperandoResposta.remove(remetenteMensagemRecebida)
-			#	filhos.remove(remetenteMensagemRecebida)
 
+			if remetenteMensagemRecebida in vizinhosEsperandoResposta:
+				vizinhosEsperandoResposta.remove(remetenteMensagemRecebida)
+				filhos.remove(remetenteMensagemRecebida)
+		
 		else:
 			print("Nó pai é: " + str(mensagem["remetente"]))
 
@@ -100,27 +100,42 @@ def eleicaoCoordenador(mensagemJson, idNo, capacidade, idNoPai, vizinhos, vizinh
 			vizinhosEsperandoResposta.remove(mensagem["remetente"])
 			filhos.remove(mensagem["remetente"])
 	
-	# Atualiza o maior recurso recebido por aquele nó
+	# Atualiza o maior recurso recebido por aquele nó e caso chegue no nó pai o coordenador é repassado aos filhos
 	elif mensagem["tipo"] == "recurso":
 		print("Recurso "+ str(mensagem["recurso"]) +" informado de " + str(mensagem["remetente"]))
 		vizinhosEsperandoResposta.remove(mensagem["remetente"])
 
 		if maiorRecurso[0] < mensagem["recurso"]:
 			maiorRecurso[0] = mensagem["recurso"]
+			idMaiorRecurso[0] = mensagem["idMaiorRecurso"] 
 
-		if mensagem["pai"] == idNo:
-			print("envia mensagem de atualizar os outros nós!!!")
+		if mensagem["pai"] == idNo and not vizinhosEsperandoResposta:
+			print("Vencedor é o nó " + str(idMaiorRecurso[0]) + " que possui capacidade: " + str(maiorRecurso[0]))
+			
+			for filho in filhos:
+				mensagem = {"tipo": "atualizarCoordenador", "remetente": idNo, "idEleicao": mensagem["idEleicao"], "recursoAtualizado": maiorRecurso[0], "idMaiorRecurso": idMaiorRecurso[0]}
+				jsonMensagem = json.dumps(mensagem)
+				sender(jsonMensagem, 10000+filho)
 			return
+
+	# Repassa o novo coordenador para os seus filhos
+	elif mensagem["tipo"] == "atualizarCoordenador":
+		print("Vencedor é o nó " + str(mensagem["idMaiorRecurso"]) + " que possui capacidade: " + str(mensagem["recursoAtualizado"]))
+		for filho in filhos:
+				mensagem = {"tipo": "atualizarCoordenador", "remetente": idNo, "idEleicao": mensagem["idEleicao"], "recursoAtualizado": mensagem["recursoAtualizado"], "idMaiorRecurso": mensagem["idMaiorRecurso"]}
+				jsonMensagem = json.dumps(mensagem)
+				sender(jsonMensagem, 10000+filho)
 		
 	# Quando não houver mais vizinhos para iterar é enviado a quantidade de recurso para o nó pai
-	if not vizinhosEsperandoResposta:
-		mensagem = {"tipo": "recurso", "remetente": idNo, "idEleicao": mensagem["idEleicao"], "pai": mensagem["pai"], "recurso": maiorRecurso[0]}
+	if not vizinhosEsperandoResposta and not enviadoRecurso[0]:
+		mensagem = {"tipo": "recurso", "remetente": idNo, "idEleicao": mensagem["idEleicao"], "pai": mensagem["pai"], "recurso": maiorRecurso[0], "idMaiorRecurso": idMaiorRecurso[0]}
 		jsonMensagem = json.dumps(mensagem)
 		sender(jsonMensagem, 10000+idNoPai[0])
 
 		print("Enviado recurso " + str(mensagem["recurso"]) + " para " + str(idNoPai[0]))
-
-	time.sleep(20)
+		enviadoRecurso[0] = True
+	
+	time.sleep(40)
 
 
 ##############################################
@@ -128,14 +143,14 @@ def eleicaoCoordenador(mensagemJson, idNo, capacidade, idNoPai, vizinhos, vizinh
 ##############################################
 
 # Recebe mensagens via socket UDP
-def receiver(idNo, capacidade, idNoPai, vizinhos, vizinhosEsperandoResposta, filhos, idEleicaoAtual, maiorRecurso):
+def receiver(idNo, capacidade, idNoPai, vizinhos, vizinhosEsperandoResposta, filhos, idEleicaoAtual, maiorRecurso, idMaiorRecurso, enviadoRecurso):
 	sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	server_address = ('', 10000 + idNo)
 	sock.bind(server_address)
 
 	while(True):
 		data, address = sock.recvfrom(4096)
-		eleicaoCoordenador(data, idNo, capacidade, idNoPai, vizinhos, vizinhosEsperandoResposta, filhos, idEleicaoAtual, maiorRecurso)
+		eleicaoCoordenador(data, idNo, capacidade, idNoPai, vizinhos, vizinhosEsperandoResposta, filhos, idEleicaoAtual, maiorRecurso, idMaiorRecurso, enviadoRecurso)
 
 # Envia mensagens
 def sender(mensagem, portaPross):
@@ -153,6 +168,8 @@ capacidade = [int(input("Capacidade: "))]
 idNoPai = [None]
 idEleicaoAtual = [None]
 maiorRecurso = [capacidade[0]]
+idMaiorRecurso = [idNo]
+enviadoRecurso = [False]
 
 # Obtém os vizinhos
 vizinhos = configurarVizinhos(int(idNo))
@@ -160,7 +177,7 @@ vizinhosEsperandoResposta = vizinhos.copy()
 filhos = vizinhos.copy() 
 
 # Configura o servidor UDP para esse nó
-t1 = threading.Thread(target=receiver, args=(idNo, capacidade, idNoPai, vizinhos, vizinhosEsperandoResposta, filhos, idEleicaoAtual, maiorRecurso))
+t1 = threading.Thread(target=receiver, args=(idNo, capacidade, idNoPai, vizinhos, vizinhosEsperandoResposta, filhos, idEleicaoAtual, maiorRecurso, idMaiorRecurso, enviadoRecurso))
 t1.start()
 
 # Inicia uma nova eleição recebendo um id de eleição e enviado uma mensagem de eleição aos seus vizinhos
