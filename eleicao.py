@@ -1,3 +1,6 @@
+#!/usr/local/bin/python3
+# coding: utf-8
+
 ##############################################
 # Eleição de líder em ambientes sem fio
 # Intergrantes: 
@@ -50,16 +53,58 @@ def configurarVizinhos(idRoteador):
 # Execução da eleição
 ##############################################
 
+
+def exibirEstruturas(vizinhosEsperandoResposta, filhos):
+	print("Vizinhos aguardando resporta: " + str(vizinhosEsperandoResposta))
+	print("Filhos: " + str(filhos))
+
+# resetarEstruturas
+def resetaEstruturas(idNo, capacidade, idNoPai, vizinhos, vizinhosEsperandoResposta, filhos, idEleicaoAtual, maiorRecurso, idMaiorRecurso, enviadoRecurso):
+	idNoPai[0] = None
+	idEleicaoAtual[0] = None
+	maiorRecurso[0] = capacidade[0]
+	idMaiorRecurso[0] = idNo
+	enviadoRecurso[0] = False
+	vizinhosEsperandoResposta.clear()
+	filhos.clear()
+
+	for vizinho in vizinhos:
+		vizinhosEsperandoResposta.append(vizinho)
+		filhos.append(vizinho)
+
 # Executa a eleição do coordenador
 def eleicaoCoordenador(mensagemJson, idNo, capacidade, idNoPai, vizinhos, vizinhosEsperandoResposta, filhos, idEleicaoAtual, maiorRecurso, idMaiorRecurso, enviadoRecurso):
 	mensagem = json.loads(mensagemJson.decode('utf-8'))
 
 	# Verifica se há eleição atual, caso exista escolhe a com maior prioridade 
 	if idEleicaoAtual[0] is not None:
-		if int(idEleicaoAtual[0]) > int(mensagem["idEleicao"]):
-			print("Pacote dropado")
-			# dropa pacotes e reinicia estruturas
-			return			
+		if  int(mensagem["idEleicao"]) < int(idEleicaoAtual[0]):
+			# dropa pacotes
+			print("[" + idEleicaoAtual[0] + "] Pacote dropado da eleição [" + mensagem["idEleicao"] + "]")
+			return
+		elif int(mensagem["idEleicao"]) > int(idEleicaoAtual[0]):
+			resetaEstruturas(idNo, capacidade, idNoPai, vizinhos, vizinhosEsperandoResposta, filhos, idEleicaoAtual, maiorRecurso, idMaiorRecurso, enviadoRecurso)
+			
+			idEleicaoAtual[0] = mensagem["idEleicao"]
+			idNoPai[0] = mensagem["remetente"]
+			vizinhosEsperandoResposta.remove(mensagem["remetente"])
+			filhos.remove(mensagem["remetente"])
+
+			print("[" + mensagem["idEleicao"] + "] Nó pai é: " + str(idNoPai[0]))
+			mensagem = {"tipo": "eleicao", "remetente": idNo, "idEleicao": mensagem["idEleicao"], "pai": mensagem["pai"]}
+			jsonMensagem = json.dumps(mensagem)	
+
+			for vizinho in vizinhosEsperandoResposta:
+				sender(jsonMensagem, 10000+vizinho)
+			exibirEstruturas(vizinhosEsperandoResposta, filhos)
+
+			if not vizinhosEsperandoResposta:
+				mensagem = {"tipo": "recurso", "remetente": idNo, "idEleicao": mensagem["idEleicao"], "pai": mensagem["pai"], "recurso": maiorRecurso[0], "idMaiorRecurso": idMaiorRecurso[0]}
+				jsonMensagem = json.dumps(mensagem)
+				sender(jsonMensagem, 10000+idNoPai[0])
+				enviadoRecurso[0] = True
+
+			return
 	else:
 		idEleicaoAtual[0] = mensagem["idEleicao"] 
 
@@ -68,7 +113,7 @@ def eleicaoCoordenador(mensagemJson, idNo, capacidade, idNoPai, vizinhos, vizinh
 	if mensagem["tipo"] == "eleicao":
 		# Caso já tenha pai é enviado ok, caso contrário é enviado mensagem de eleição para os vizinhos, exceto o pai
 		if idNoPai[0] is not None:
-			print("Enviado Ok para nó: " + str(mensagem["remetente"]))
+			print("[" + mensagem["idEleicao"] + "] Enviado Ok para nó: " + str(mensagem["remetente"]))
 
 			remetenteMensagemRecebida = mensagem["remetente"]
 			print(vizinhosEsperandoResposta)
@@ -81,7 +126,7 @@ def eleicaoCoordenador(mensagemJson, idNo, capacidade, idNoPai, vizinhos, vizinh
 				filhos.remove(remetenteMensagemRecebida)
 		
 		else:
-			print("Nó pai é: " + str(mensagem["remetente"]))
+			print("[" + mensagem["idEleicao"] + "] Nó pai é: " + str(mensagem["remetente"]))
 
 			idNoPai[0] = mensagem["remetente"]
 			vizinhosEsperandoResposta.remove(mensagem["remetente"])
@@ -89,15 +134,15 @@ def eleicaoCoordenador(mensagemJson, idNo, capacidade, idNoPai, vizinhos, vizinh
 			mensagem = {"tipo": "eleicao", "remetente": idNo, "idEleicao": mensagem["idEleicao"], "pai": mensagem["pai"]}
 			jsonMensagem = json.dumps(mensagem)
 
-			time.sleep(15)
+			time.sleep(10)
 			for vizinho in vizinhosEsperandoResposta:
 				sender(jsonMensagem, 10000+vizinho)
 
-		time.sleep(15)
+		time.sleep(10)
 
 	# Caso ainda tenha o vizinho no vetor vizinhosEsperandoResposta ele é removido
 	elif mensagem["tipo"] == "ok":
-		print("Recebido Ok de: " + str(mensagem["remetente"]))
+		print("[" + mensagem["idEleicao"] + "] Recebido Ok de: " + str(mensagem["remetente"]))
 
 		if mensagem["remetente"] in vizinhosEsperandoResposta:
 			vizinhosEsperandoResposta.remove(mensagem["remetente"])
@@ -105,7 +150,7 @@ def eleicaoCoordenador(mensagemJson, idNo, capacidade, idNoPai, vizinhos, vizinh
 	
 	# Atualiza o maior recurso recebido por aquele nó e caso chegue no nó pai o coordenador é repassado aos filhos
 	elif mensagem["tipo"] == "recurso":
-		print("Recurso "+ str(mensagem["recurso"]) +" informado de " + str(mensagem["remetente"]))
+		print("[" + mensagem["idEleicao"] + "] Recurso "+ str(mensagem["recurso"]) +" informado de " + str(mensagem["remetente"]))
 		vizinhosEsperandoResposta.remove(mensagem["remetente"])
 
 		if maiorRecurso[0] < mensagem["recurso"]:
@@ -113,25 +158,29 @@ def eleicaoCoordenador(mensagemJson, idNo, capacidade, idNoPai, vizinhos, vizinh
 			idMaiorRecurso[0] = mensagem["idMaiorRecurso"] 
 
 		if mensagem["pai"] == idNo and not vizinhosEsperandoResposta:
-			print("Vencedor é o nó " + str(idMaiorRecurso[0]) + " que possui capacidade: " + str(maiorRecurso[0]))
-			
+			print("[" + mensagem["idEleicao"] + "] Vencedor é o nó " + str(idMaiorRecurso[0]) + " que possui capacidade: " + str(maiorRecurso[0]))
+			enviadoRecurso[0] = True
+			time.sleep(5)
 			for filho in filhos:
 				mensagem = {"tipo": "atualizarCoordenador", "remetente": idNo, "idEleicao": mensagem["idEleicao"], "recursoAtualizado": maiorRecurso[0], "idMaiorRecurso": idMaiorRecurso[0]}
 				jsonMensagem = json.dumps(mensagem)
 				sender(jsonMensagem, 10000+filho)
+			resetaEstruturas(idNo, capacidade, idNoPai, vizinhos, vizinhosEsperandoResposta, filhos, idEleicaoAtual, maiorRecurso, idMaiorRecurso, enviadoRecurso)
 			return
-
-		time.sleep(30)
+		
+		time.sleep(5)
 
 	# Repassa o novo coordenador para os seus filhos
 	elif mensagem["tipo"] == "atualizarCoordenador":
-		print("Vencedor é o nó " + str(mensagem["idMaiorRecurso"]) + " que possui capacidade: " + str(mensagem["recursoAtualizado"]))
+		print("[" + mensagem["idEleicao"] + "] Vencedor é o nó " + str(mensagem["idMaiorRecurso"]) + " que possui capacidade: " + str(mensagem["recursoAtualizado"]))
+		
+		time.sleep(5)
 		for filho in filhos:
 				mensagem = {"tipo": "atualizarCoordenador", "remetente": idNo, "idEleicao": mensagem["idEleicao"], "recursoAtualizado": mensagem["recursoAtualizado"], "idMaiorRecurso": mensagem["idMaiorRecurso"]}
 				jsonMensagem = json.dumps(mensagem)
 				sender(jsonMensagem, 10000+filho)
-
-		time.sleep(30)
+		resetaEstruturas(idNo, capacidade, idNoPai, vizinhos, vizinhosEsperandoResposta, filhos, idEleicaoAtual, maiorRecurso, idMaiorRecurso, enviadoRecurso)
+		time.sleep(10)
 		
 	# Quando não houver mais vizinhos para iterar é enviado a quantidade de recurso para o nó pai
 	if not vizinhosEsperandoResposta and not enviadoRecurso[0]:
@@ -139,9 +188,9 @@ def eleicaoCoordenador(mensagemJson, idNo, capacidade, idNoPai, vizinhos, vizinh
 		jsonMensagem = json.dumps(mensagem)
 		sender(jsonMensagem, 10000+idNoPai[0])
 
-		print("Enviado recurso " + str(mensagem["recurso"]) + " para " + str(idNoPai[0]))
+		print("[" + mensagem["idEleicao"] + "] Enviado recurso " + str(mensagem["recurso"]) + " para " + str(idNoPai[0]))
 		enviadoRecurso[0] = True
-	
+		
 	#time.sleep(40)
 
 
@@ -181,7 +230,7 @@ enviadoRecurso = [False]
 # Obtém os vizinhos
 vizinhos = configurarVizinhos(int(idNo))
 vizinhosEsperandoResposta = vizinhos.copy()
-filhos = vizinhos.copy() 
+filhos = vizinhos.copy()
 
 # Configura o servidor UDP para esse nó
 t1 = threading.Thread(target=receiver, args=(idNo, capacidade, idNoPai, vizinhos, vizinhosEsperandoResposta, filhos, idEleicaoAtual, maiorRecurso, idMaiorRecurso, enviadoRecurso))
@@ -191,18 +240,9 @@ t1.start()
 while(True): 
 	input()
 	idEleicao = input("ID Eleição: ")
+
 	mensagem = {"tipo": "eleicao", "remetente": idNo, "idEleicao": idEleicao.zfill(3) + str(idNo).zfill(3), "pai": idNo}
 	jsonMensagem = json.dumps(mensagem)
 
 	for vizinho in vizinhos:
 		sender(jsonMensagem, 10000+vizinho)
-
-
-
-
-
-
-
-
-
-
