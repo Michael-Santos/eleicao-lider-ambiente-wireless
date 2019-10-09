@@ -10,4 +10,4 @@ E digitar o id do nó e em seguida a capacidade do nó
 # A topologia
 
 
-![Topologia](topografia.png)
+![Topologia](topologia.png)
