@@ -7,7 +7,7 @@ $ python3 eleicao.py
 
 E digitar o id do nó e em seguida a capacidade do nó
 
-# A topografia
+# A topologia
 
 
-![Topografia](topografia.png)
+![Topologia](topografia.png)
